@@ -73,21 +73,25 @@ public class ThreadFun implements Runnable{
 
         try {
             clientSocket.setSoTimeout(1000);
+            value = input.read();
         } catch (SocketException e) {
             e.printStackTrace();
         }
-        value = input.read();
         while ((char)value != '\u0007')
         {
             if (value == -1){
-                if (ret.equals(""))
+                if (ret.equals("")) {
                     return "empty";
+                }
                 return "end";
             }
 
             ret += (char)value;
             if (ret.length() > maxLen)
                 return "end";
+
+            clientSocket.setSoTimeout(1000);
+            value = input.read();
         }
 
         value = input.read();
@@ -104,18 +108,22 @@ public class ThreadFun implements Runnable{
 
     private boolean auth() throws IOException {
 
-        try {
-            clientSocket.setSoTimeout(1);
-        } catch (SocketException e) {
-            e.printStackTrace();
-        }
-
+//        try {
+//            clientSocket.setSoTimeout(1);
+//        } catch (SocketException e) {
+//            e.printStackTrace();
+//        }
         String name = null;
         name = getNext(Message.CLIENT_USERNAME);
 
         if (name.equals("end") || name.equals("empty"))
             return false;
 
+        System.out.println(name);
+
+        outputStream.writeBytes(Message.SERVER_KEY_REQUEST + Message.TERM);
+
+        //outputStream.writeBytes("107 KEY REQUEST" + Message.TERM);
 
         int clientKeyID = Integer.parseInt(getNext(Message.CLIENT_KEY_ID));
         int serverKey = 0;
@@ -127,17 +135,17 @@ public class ThreadFun implements Runnable{
             case 2: serverKey = 18789; clientKey = 13603;
             case 3: serverKey = 16443; clientKey = 29533;
             case 4: serverKey = 18189; clientKey = 21952;
-            default:
-                try {
-                    outputStream.writeChars(Message.SERVER_KEY_OUT_OF_RANGE_ERROR + Message.TERM);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
         }
 
+        if (serverKey == 0 && clientKey == 0)
+            outputStream.writeChars(Message.SERVER_KEY_OUT_OF_RANGE_ERROR + Message.TERM);
+        System.out.println(clientKeyID);
         int nameVal = 0;
-        for(int i = 0; i < name.length(); i++)
-            nameVal += Integer.parseInt(String.valueOf(name.charAt(i)));
+        char c;
+        for(int i = 0; i < name.length(); i++){
+            c = name.charAt(i);
+            nameVal += (int)c;
+        }
 
         nameVal *= 1000;
         int hash = nameVal % 65536;
@@ -146,19 +154,21 @@ public class ThreadFun implements Runnable{
         hash %= 65536;
 
         try {
-            outputStream.writeChars(String.valueOf(hash) + Message.TERM);
+            outputStream.writeBytes(String.valueOf(hash) + Message.TERM);
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         String clientConfirm = getNext(Message.CLIENT_CONFIRMATION);
+        System.out.println(clientConfirm);
         int clientHash = Integer.parseInt(clientConfirm) + 65536 - clientKey;
         clientHash %= 65536;
 
+        System.out.println("tusom");
         if(clientHash == hash)
         {
             try {
-                outputStream.writeChars(Message.SERVER_OK + Message.TERM);
+                outputStream.writeBytes(Message.SERVER_OK + Message.TERM);
             } catch (IOException e) {
                 e.printStackTrace();
             }
